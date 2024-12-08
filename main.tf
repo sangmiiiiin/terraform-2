@@ -17,6 +17,7 @@ resource "aws_vpc" "sangmin-vpc" {
   cidr_block           = "10.0.0.0/16"
   enable_dns_support   = true
   enable_dns_hostnames = true
+
   tags = {
     Name = "sangmin-vpc"
   }
@@ -42,16 +43,49 @@ resource "aws_subnet" "ecr-private-subnet" {
   cidr_block        = cidrsubnet(aws_vpc.sangmin-vpc.cidr_block, 8, count.index + 3)
   availability_zone = ["ap-northeast-2a", "ap-northeast-2c"][count.index % 2]
 
-tags = {
+  tags = {
     Name = lookup(
       {
-        0 = "ecr-pri-was-subnet-2a"
-        1 = "ecr-pri-was-subnet-2c"
-        2 = "ecr-pri-rds-subnet-2a"
-        3 = "ecr-pri-rds-subnet-2c"
+        0 = "ecr-pri-subnet-2a-1"
+        1 = "ecr-pri-subnet-2c-2"
+        2 = "ecr-pri-subnet-2a-3"
+        3 = "ecr-pri-subnet-2c-4"
       },
       count.index,
       "default-subnet-name"
     )
   }
+}
+
+resource "aws_internet_gateway" "ecr-igw" {
+  vpc_id = aws_vpc.sangmin-vpc.id
+
+  tags = {
+    Name = "ecr-igw"
+  }
+}
+
+resource "aws_route_table" "ecr-igw-rt" {
+  vpc_id = aws_vpc.sangmin-vpc.id
+
+  route {
+    cidr_block = "0.0.0.0/0"
+    gateway_id = aws_internet_gateway.ecr-igw.id
+  }
+
+  tags = {
+    Name = "ecr-igw-rt"
+  }
+}
+
+# public subnet 1에 라우팅 테이블 연결
+resource "aws_route_table_association" "ecr-pub-subnet-2a-rt-assoc" {
+  subnet_id      = aws_subnet.ecr-public-subnet[0].id
+  route_table_id = aws_route_table.ecr-igw-rt.id
+}
+
+# public subnet 2에 라우팅 테이블 연결
+resource "aws_route_table_association" "ecr-pub-subnet-2c-rt-assoc" {
+  subnet_id      = aws_subnet.ecr-public-subnet[1].id
+  route_table_id = aws_route_table.ecr-igw-rt.id
 }
