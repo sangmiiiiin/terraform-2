@@ -7,38 +7,51 @@ terraform {
   }
 }
 
+# AWS 프로바이더 사용
 provider "aws" {
-  region = "ap-northeast-2"
+  region = "ap-northeast-2" # 서울 리전
 }
 
-# create instance on default vpc
-resource "aws_instance" "ubuntu" {
-  ami           = "ami-0dc44556af6f78a7b"
-  instance_type = "t2.micro"
-  key_name      = "multi-key"
-  security_groups = [aws_security_group.allow_ssh.name]
+# VPC 생성
+resource "aws_vpc" "sangmin-vpc" {
+  cidr_block           = "10.0.0.0/16"
+  enable_dns_support   = true
+  enable_dns_hostnames = true
+  tags = {
+    Name = "sangmin-vpc"
+  }
+}
 
+# public subnet 생성
+resource "aws_subnet" "ecr-public-subnet" {
+  count                   = 2
+  vpc_id                  = aws_vpc.sangmin-vpc.id
+  cidr_block              = cidrsubnet(aws_vpc.sangmin-vpc.cidr_block, 8, count.index + 1)
+  availability_zone       = ["ap-northeast-2a", "ap-northeast-2c"][count.index]
+  map_public_ip_on_launch = true
 
   tags = {
-    Name = "sexy-ubuntu"
+    Name = count.index == 0 ? "ecr-pub-subnet-2a" : "ecr-pub-subnet-2c"
   }
 }
 
-resource "aws_security_group" "allow_ssh" {
-    name = "allow_ssh"
+# private subnet 생성
+resource "aws_subnet" "ecr-private-subnet" {
+  count             = 4
+  vpc_id            = aws_vpc.sangmin-vpc.id
+  cidr_block        = cidrsubnet(aws_vpc.sangmin-vpc.cidr_block, 8, count.index + 3)
+  availability_zone = ["ap-northeast-2a", "ap-northeast-2c"][count.index % 2]
 
-  ingress {
-    from_port   = 22
-    to_port     = 22
-    protocol    = "22"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
-
-  egress {
-    from_port        = 0
-    to_port          = 0
-    protocol         = "-1"
-    cidr_blocks      = ["0.0.0.0/0"]
-    ipv6_cidr_blocks = ["::/0"]
+tags = {
+    Name = lookup(
+      {
+        0 = "ecr-pri-was-subnet-2a"
+        1 = "ecr-pri-was-subnet-2c"
+        2 = "ecr-pri-rds-subnet-2a"
+        3 = "ecr-pri-rds-subnet-2c"
+      },
+      count.index,
+      "default-subnet-name"
+    )
   }
 }
