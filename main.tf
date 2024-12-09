@@ -107,6 +107,7 @@ data "aws_ami" "al-recent" {
 resource "aws_security_group" "allow_ssh" {
   name        = "allow_ssh"
   description = "Allow ssh inbound traffic and all outbound traffic"
+  vpc_id      = aws_vpc.sangmin-vpc.id
 
   tags = {
     Name = "allow_ssh"
@@ -132,13 +133,23 @@ resource "aws_vpc_security_group_egress_rule" "allow_all_ipv4" {
 }
 
 resource "aws_instance" "bastion" {
-  ami             = data.aws_ami.al-recent.id
-  instance_type   = "t2.micro"
-  security_groups = [aws_security_group.allow_ssh.name]
-  key_name = "multi-key"
-  availability_zone = aws_subnet.ecr-public-subnet[0].availability_zone
+  ami                    = data.aws_ami.al-recent.id
+  instance_type          = "t2.micro"
+  vpc_security_group_ids = [aws_security_group.allow_ssh.id]
+  key_name               = "multi-key"
+  # availability_zone      = aws_subnet.ecr-public-subnet[0].availability_zone
+  subnet_id = aws_subnet.ecr-public-subnet[0].id # public 서브넷의 ID 사용
+
   tags = {
     Name = "bastion"
   }
-
 }
+
+output "ami-id" {
+  value = data.aws_ami.al-recent.id
+}
+
+output "security_group_id" {
+  value = aws_security_group.allow_ssh.id
+}
+
